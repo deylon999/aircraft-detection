@@ -140,7 +140,17 @@ def run_inference(model_name: str, source: str, cfg: dict, ckpt: str | None = No
         raise FileNotFoundError(f"Источник не найден: {src}")
 
     if model_family(model_name) == "ultralytics":
-        _run_ultralytics(model_name, ckpt or "", src, cfg, out_dir)
+        if not ckpt:
+            # канонический чекпойнт; откат на родную папку ultralytics
+            cand = Path(cfg["output"]["checkpoints"]) / model_name / "best.pt"
+            if not cand.exists():
+                cand = Path(cfg["output"]["logs"]) / "ultralytics" / model_name / "weights" / "best.pt"
+            ckpt = str(cand)
+        if not Path(ckpt).exists():
+            raise FileNotFoundError(
+                f"Не нашёл обученные веса {model_name}: {ckpt}. Сначала обучите модель."
+            )
+        _run_ultralytics(model_name, ckpt, src, cfg, out_dir)
     else:
         if not ckpt:
             ckpt = str(Path(cfg["output"]["checkpoints"]) / model_name / "best.pt")

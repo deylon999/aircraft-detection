@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import math
+import shutil
 import time
 from pathlib import Path
 
@@ -191,6 +192,16 @@ def train_ultralytics(model_name: str, cfg: dict) -> dict:
     )
     # ultralytics сам пишет метрики/графики в project/name/.
     save_dir = Path(results.save_dir) if hasattr(results, "save_dir") else None
+
+    # Дублируем лучший вес в КАНОНИЧЕСКОЕ место results/checkpoints/<model>/best.pt,
+    # чтобы веса ВСЕХ 5 моделей лежали в одном предсказуемом месте (оригинал
+    # ultralytics со своими графиками остаётся нетронутым).
+    src_best = Path(cfg["output"]["logs"]) / "ultralytics" / model_name / "weights" / "best.pt"
+    if src_best.exists():
+        dst = ensure_dir(Path(cfg["output"]["checkpoints"]) / model_name) / "best.pt"
+        shutil.copy2(src_best, dst)
+        log.info("Веса продублированы -> %s", dst)
+
     log.info("Готово %s | результаты ultralytics -> %s", model_name, save_dir)
     return {"model": model_name, "save_dir": str(save_dir)}
 
