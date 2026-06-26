@@ -1,0 +1,87 @@
+# ===========================================================================
+# Конфигурация экспериментов по детекции типов самолётов (FGVC-Aircraft)
+# Все пути, гиперпараметры и настройки эксперимента собраны здесь для
+# воспроизводимости (см. требование 3.6 / 11.2 задания).
+# ===========================================================================
+
+seed: 42                      # фиксируем для воспроизводимости
+
+# --- данные ---
+data:
+  root: data/raw             # сюда torchvision скачает FGVC-Aircraft
+  processed: data/processed  # сюда кладём конвертированные аннотации (YOLO/COCO)
+  annotation_level: variant  # variant | family | manufacturer
+  # Подмножество гражданских авиалайнеров для детекции.
+  # null -> использовать ВСЕ классы выбранного уровня.
+  # Список с обязательными A320 и A321 (главная fine-grained пара проекта).
+  # ВНИМАНИЕ: имена должны ТОЧНО совпадать с variants.txt из FGVC-Aircraft.
+  # Boeing записаны без слова "Boeing": "737-800", "747-400" и т.д.
+  classes:
+    - "A319"
+    - "A320"
+    - "A321"
+    - "A330-200"
+    - "A330-300"
+    - "A340-300"
+    - "737-700"
+    - "737-800"
+    - "747-400"
+    - "757-200"
+    - "767-300"
+    - "777-200"
+    - "777-300"
+    - "E-190"
+    - "CRJ-900"
+  splits:                    # FGVC уже имеет свои train/val/test
+    train: trainval
+    val: test                # используем test как hold-out для сравнения
+  img_size: 640
+  # нормализация ImageNet (для torchvision-моделей)
+  norm_mean: [0.485, 0.456, 0.406]
+  norm_std:  [0.229, 0.224, 0.225]
+
+# --- аугментации (albumentations), применяются только к train ---
+augment:
+  hflip: 0.5
+  brightness_contrast: 0.2
+  hue_sat: 0.2
+  scale_rotate: 0.0          # самолёты редко перевёрнуты — выключено по умолчанию
+  blur: 0.05
+
+# --- обучение ---
+train:
+  epochs: 40
+  # batch=4 — безопасно для самых тяжёлых (Faster R-CNN, RT-DETR) на 8 ГБ VRAM.
+  # Для YOLOv8/SSD можно поднять до 8-16 (переопределяется флагом --batch).
+  batch_size: 4
+  optimizer: adamw          # adamw | sgd
+  lr: 0.0005
+  weight_decay: 0.0005
+  momentum: 0.9             # для sgd
+  lr_scheduler: cosine      # cosine | step | none
+  warmup_epochs: 3
+  amp: true                 # mixed precision — экономит VRAM
+  num_workers: 4
+  device: cuda              # cuda | cpu
+  early_stopping_patience: 10
+
+# --- оценка ---
+eval:
+  iou_threshold: 0.5        # порог IoU для mAP@0.5 и P/R/F1
+  conf_threshold: 0.25      # порог уверенности на инференсе
+  nms_iou: 0.5
+
+# --- пути результатов ---
+output:
+  checkpoints: results/checkpoints
+  logs: results/logs
+  plots: results/plots
+
+# --- модели: оставьте нужные для эксперимента ---
+# Параметры конкретной модели можно переопределять в configs/<model>.yaml
+models:
+  - yolov8
+  - faster_rcnn
+  - ssd
+  - retinanet
+  - rtdetr

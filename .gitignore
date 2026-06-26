@@ -1,0 +1,42 @@
+# --- данные (тяжёлые, не коммитим) ---
+data/raw/
+data/processed/
+*.zip
+*.tar
+*.tar.gz
+
+# --- результаты обучения ---
+results/logs/
+results/plots/
+results/checkpoints/
+runs/
+*.pt
+*.pth
+*.onnx
+wandb/
+
+# --- видео/изображения демо ---
+*.mp4
+*.avi
+*.mov
+demo_inputs/
+demo_outputs/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.ipynb_checkpoints/
+.venv/
+venv/
+env/
+
+# --- IDE / ОС ---
+.claude/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,42 @@
+# ===========================================================================
+# CV-project: детекция типов самолётов (FGVC-Aircraft)
+# ---------------------------------------------------------------------------
+# ВАЖНО: PyTorch с поддержкой CUDA нужно ставить ОТДЕЛЬНО под вашу видеокарту.
+# Для RTX 4060 Ti (CUDA 12.x) выполните ПЕРЕД установкой этого файла:
+#
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+#
+# Проверка GPU:  python -c "import torch; print(torch.cuda.is_available())"
+# ===========================================================================
+
+# --- ядро ---
+torch>=2.2          # ставится отдельно с CUDA (см. выше)
+torchvision>=0.17   # ставится отдельно с CUDA (см. выше)
+
+# --- модели ---
+ultralytics>=8.2    # YOLOv8 и RT-DETR
+
+# --- данные / аугментации / видео ---
+albumentations>=1.4
+opencv-python>=4.9
+pillow>=10.0
+
+# --- метрики / оценка ---
+torchmetrics>=1.3   # mAP, precision, recall
+pycocotools>=2.0.7  # COCO-mAP (на Windows ставится колёсами)
+scikit-learn>=1.4   # confusion matrix, F1
+
+# --- анализ / графики ---
+numpy>=1.26
+pandas>=2.2
+matplotlib>=3.8
+seaborn>=0.13
+tqdm>=4.66
+
+# --- конфиги / логирование ---
+pyyaml>=6.0
+tensorboard>=2.16
+
+# --- ноутбуки ---
+jupyter>=1.0
+ipykernel>=6.29
