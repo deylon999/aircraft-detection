@@ -25,7 +25,7 @@ def _read_history(model_name: str, logs_dir: Path) -> pd.DataFrame | None:
     j = logs_dir / f"{model_name}_history.json"
     if j.exists():
         return pd.DataFrame(json.loads(j.read_text(encoding="utf-8")))
-    csv = logs_dir / "ultralytics" / model_name / "results.csv"
+    csv = (logs_dir / "ultralytics" / model_name / "results.csv").resolve()
     if csv.exists():
         df = pd.read_csv(csv)
         df.columns = [c.strip() for c in df.columns]

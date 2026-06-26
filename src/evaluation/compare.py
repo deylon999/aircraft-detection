@@ -70,8 +70,8 @@ def _predict_torchvision(model_name: str, cfg: dict, records) -> list[dict]:
 def _predict_ultralytics(model_name: str, cfg: dict, records) -> list[dict]:
     from src.utils.inference import _load_ultra
 
-    # лучший чекпойнт ultralytics
-    ckpt = Path(cfg["output"]["logs"]) / "ultralytics" / model_name / "weights" / "best.pt"
+    # лучший чекпойнт ultralytics (путь абсолютный — как при обучении)
+    ckpt = (Path(cfg["output"]["logs"]) / "ultralytics" / model_name / "weights" / "best.pt").resolve()
     model = _load_ultra(model_name, str(ckpt))
     device = 0 if get_device(cfg["train"]["device"]).type == "cuda" else "cpu"
     preds = []

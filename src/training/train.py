@@ -184,7 +184,7 @@ def train_ultralytics(model_name: str, cfg: dict) -> dict:
         amp=tcfg["amp"],
         patience=tcfg.get("early_stopping_patience", 10),
         seed=cfg.get("seed", 42),
-        project=str(Path(cfg["output"]["logs"]) / "ultralytics"),
+        project=str((Path(cfg["output"]["logs"]) / "ultralytics").resolve()),
         name=model_name,
         exist_ok=True,
         verbose=True,

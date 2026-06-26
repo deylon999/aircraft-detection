@@ -29,12 +29,42 @@ log = get_logger("prepare")
 _FGVC_DIRNAME = "fgvc-aircraft-2013b"
 
 
+def _is_complete(data_dir: Path) -> bool:
+    """Проверяет, что датасет распакован ПОЛНОСТЬЮ (а не оборван на середине).
+
+    Сравнивает число распакованных .jpg с числом строк в images_box.txt
+    (по строке на изображение). Так ловим прерванную загрузку.
+    """
+    box_file = data_dir / "images_box.txt"
+    images_dir = data_dir / "images"
+    if not box_file.exists() or not images_dir.exists():
+        return False
+    expected = sum(1 for _ in open(box_file, "r", encoding="utf-8"))
+    actual = sum(1 for _ in images_dir.glob("*.jpg"))
+    if actual < expected:
+        log.warning("Датасет неполный: %d из %d изображений (загрузка была прервана).", actual, expected)
+        return False
+    return True
+
+
 def _download_fgvc(raw_root: Path) -> Path:
     """Скачивает FGVC-Aircraft через torchvision и возвращает путь к data-папке."""
-    data_dir = raw_root / _FGVC_DIRNAME / "data"
-    if data_dir.exists() and (data_dir / "images_box.txt").exists():
-        log.info("FGVC-Aircraft уже на месте: %s", data_dir)
+    import shutil
+
+    fgvc_root = raw_root / _FGVC_DIRNAME
+    data_dir = fgvc_root / "data"
+
+    if _is_complete(data_dir):
+        log.info("FGVC-Aircraft уже на месте и полный: %s", data_dir)
         return data_dir
+
+    # Частичная/битая загрузка -> удаляем и качаем заново начисто.
+    if fgvc_root.exists():
+        log.warning("Удаляю неполную загрузку %s и качаю заново...", fgvc_root)
+        shutil.rmtree(fgvc_root, ignore_errors=True)
+    # подчищаем возможный обрезанный архив
+    for arc in raw_root.glob("fgvc-aircraft-2013b.tar*"):
+        arc.unlink(missing_ok=True)
 
     log.info("Скачиваю FGVC-Aircraft в %s (~2.75 ГБ, это надолго)...", raw_root)
     from torchvision.datasets import FGVCAircraft  # импорт здесь, чтобы не тянуть torch без нужды
@@ -42,9 +72,12 @@ def _download_fgvc(raw_root: Path) -> Path:
     ensure_dir(raw_root)
     # download=True скачает и распакует архив. Сам датасет-объект нам не нужен.
     FGVCAircraft(root=str(raw_root), split="trainval", download=True)
-    if not (data_dir / "images_box.txt").exists():
-        raise FileNotFoundError(f"Не нашёл images_box.txt в {data_dir} после скачивания.")
-    log.info("Скачивание завершено.")
+    if not _is_complete(data_dir):
+        raise RuntimeError(
+            f"После скачивания датасет всё ещё неполный в {data_dir}. "
+            "Проверьте соединение/место на диске и запустите prepare ещё раз."
+        )
+    log.info("Скачивание завершено и проверено.")
     return data_dir
 
 
