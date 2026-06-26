@@ -34,6 +34,9 @@ dist/
 venv/
 env/
 
+# --- личный журнал проекта (не публикуем) ---
+PROGRESS.md
+
 # --- IDE / ОС ---
 .claude/
 .vscode/
