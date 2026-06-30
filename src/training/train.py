@@ -40,8 +40,23 @@ def _build_optimizer(model, tcfg):
 def _build_scheduler(optimizer, tcfg, steps_per_epoch):
     kind = tcfg.get("lr_scheduler", "none")
     epochs = tcfg["epochs"]
+    warmup = int(tcfg.get("warmup_epochs", 0) or 0)
     if kind == "cosine":
-        return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+        # Косинус на оставшиеся после прогрева эпохи.
+        cosine = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=max(1, epochs - warmup)
+        )
+        if warmup > 0:
+            # Линейный прогрев LR с почти нуля: без него полный lr по «холодным»
+            # головам детектора на 1-2 эпохе провоцирует взрыв градиента/NaN
+            # (особенно у RetinaNet с focal loss).
+            warm = torch.optim.lr_scheduler.LinearLR(
+                optimizer, start_factor=0.01, end_factor=1.0, total_iters=warmup
+            )
+            return torch.optim.lr_scheduler.SequentialLR(
+                optimizer, schedulers=[warm, cosine], milestones=[warmup]
+            )
+        return cosine
     if kind == "step":
         return torch.optim.lr_scheduler.StepLR(optimizer, step_size=max(1, epochs // 3), gamma=0.1)
     return None
@@ -86,7 +101,15 @@ def train_torchvision(model_name: str, cfg: dict) -> dict:
     train_loader, val_loader = build_dataloaders(cfg)
     optimizer = _build_optimizer(model, tcfg)
     scheduler = _build_scheduler(optimizer, tcfg, len(train_loader))
-    scaler = torch.cuda.amp.GradScaler(enabled=tcfg["amp"] and device.type == "cuda")
+
+    # AMP экономит VRAM, но focal loss RetinaNet под fp16 численно нестабилен
+    # (log/exp переполняются -> inf/NaN, обучение недетерминированно срывается).
+    # Для RetinaNet считаем в fp32; в 8 ГБ при batch=4 это влезает.
+    use_amp = bool(tcfg["amp"]) and device.type == "cuda" and model_name != "retinanet"
+    if tcfg["amp"] and model_name == "retinanet":
+        log.info("AMP отключён для retinanet (нестабильность focal loss в fp16)")
+    grad_clip = float(tcfg.get("grad_clip", 1.0))
+    scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
 
     history = []
     best_map = -1.0
@@ -104,14 +127,19 @@ def train_torchvision(model_name: str, cfg: dict) -> dict:
             tgts = [{k: v.to(device) for k, v in t.items()} for t in batch_targets]
 
             optimizer.zero_grad()
-            with torch.cuda.amp.autocast(enabled=tcfg["amp"] and device.type == "cuda"):
+            with torch.cuda.amp.autocast(enabled=use_amp):
                 loss_dict = model(images, tgts)
                 loss = sum(loss_dict.values())
 
             if not math.isfinite(loss.item()):
                 log.warning("Не-конечный loss, пропускаю шаг")
+                optimizer.zero_grad(set_to_none=True)
                 continue
             scaler.scale(loss).backward()
+            # Клиппинг по норме (на размасштабированных градиентах) гасит редкие
+            # всплески и не даёт обучению уйти в NaN. unscale_/clip — no-op при AMP off.
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=grad_clip)
             scaler.step(optimizer)
             scaler.update()
             running += loss.item()

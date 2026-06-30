@@ -59,8 +59,9 @@ train:
   weight_decay: 0.0005
   momentum: 0.9             # для sgd
   lr_scheduler: cosine      # cosine | step | none
-  warmup_epochs: 3
-  amp: true                 # mixed precision — экономит VRAM
+  warmup_epochs: 3          # линейный прогрев LR (реализован в _build_scheduler)
+  grad_clip: 1.0            # клиппинг нормы градиентов — защита от взрыва/NaN
+  amp: true                 # mixed precision — экономит VRAM (авто-выкл для retinanet)
   num_workers: 4
   device: cuda              # cuda | cpu
   # При косинусном LR-графике ранняя остановка вредна: она срабатывает на
